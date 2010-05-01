@@ -14,7 +14,7 @@ class Bucket(collections.MutableMapping):
     
     """
     
-    def __init__(self, path, name='keystore'):
+    def __init__(self, path, name='__bucket__'):
         self._path = path
         self._table = "'%s'" % name.replace("'", "''")
         self._local = threading.local()
@@ -56,6 +56,7 @@ class Bucket(collections.MutableMapping):
         self.setmany([(key, value)])
 
     def __getitem__(self, key):
+        # print 'getting', repr(key)
         cur = self._conn.cursor()
         cur.execute('''SELECT value FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
         res = cur.fetchone()
@@ -63,6 +64,13 @@ class Bucket(collections.MutableMapping):
             raise KeyError(key)
         # print '__getitem__', repr(key), repr(res[0])
         return self._load_value(res[0])
+    
+    def __contains__(self, key):
+        # print 'contains', repr(key)
+        cur = self._conn.cursor()
+        cur.execute('''SELECT COUNT(*) FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
+        res = cur.fetchone()
+        return bool(res[0])
     
     def getmany(self, keys, *args):
         cur = self._conn.cursor()
@@ -118,7 +126,8 @@ class BinaryBucket(Bucket):
     """Binary safe Bucket."""
     _dump_value = staticmethod(lambda x: base64.b64encode(x))
     _load_value = staticmethod(lambda x: base64.b64decode(x))
-    
+
+
 class PickleBucket(Bucket):
     """Value-pickling Bucket."""
     _dump_value = staticmethod(lambda x: base64.b64encode(pickle.dumps(x, protocol=-1)))
@@ -154,7 +163,8 @@ def test_thread_safe():
 if __name__ == '__main__':
     
     from time import clock as time
-    import bsddb
+    # import bsddb
+    import os
     
     store = PickleBucket('testing.sqlite')
     store.clear()
@@ -166,14 +176,15 @@ if __name__ == '__main__':
     # store.setmany((str(i), str(i**2)) for i in range(1000))
     store['key'] = 'whatever'
     print store['key']
+    print 'key' in store
+    print 'not' in store
     
     for i in range(10):
-        store[str(i)] = str(i)
-        print store[str(i)]
+        store[os.urandom(5)] = os.urandom(10)
     
     print len(store)
     #     print store.keys()
-    #     print store.items()
+    print store.items()
     
     # test_thread_safe()
     
