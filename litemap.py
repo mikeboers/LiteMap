@@ -6,19 +6,23 @@ import collections
 import base64
 import threading
 
-class Bucket(collections.MutableMapping):
+class LiteMap(collections.MutableMapping):
     """Persistant mapping class.
     
     The keys and values will be truncated to null bytes. If you need a binary
-    safe Bucket, use the BinaryBucket or PickleBucket.
+    safe LiteMap, use the BinaryMap or PickleMap.
     
     """
     
     def __init__(self, path, name='__bucket__'):
         self._path = path
-        self._table = "'%s'" % name.replace("'", "''")
+        self._name = name
+        self._table = self._escape(name)
         self._local = threading.local()
         self._create_table()
+    
+    def _escape(self, v):
+        return "'%s'" % v.replace("'", "''")
     
     @property
     def _conn(self):
@@ -35,16 +39,14 @@ class Bucket(collections.MutableMapping):
                 key   BLOB UNIQUE ON CONFLICT REPLACE,
                 value BLOB
             )''' % self._table)
-            cur.execute('''CREATE INDEX IF NOT EXISTS key_index on %s (key)''' % self._table)
+            key_name = self._escape(self._name + '_index')
+            cur.execute('''CREATE INDEX IF NOT EXISTS %s on %s (key)''' % (key_name, self._table))
     
-    @staticmethod
-    def _dump_key(key):
-        if not isinstance(key, str):
-            raise TypeError('key must be str')
-        return key
-    _load_key = staticmethod(lambda x: x)
-    _dump_value = _dump_key
-    _load_value = _load_key
+    _dump_key = buffer
+    _load_key = str
+    
+    _dump_value = buffer
+    _load_value = str
     
     def setmany(self, items):
         with self._conn:
@@ -79,8 +81,8 @@ class Bucket(collections.MutableMapping):
         map = dict(cur.fetchall())
         res = [self._load_value(map.get(x, *args)) for x in keys]
         return res
-
-    def __delitem__(self, key):    
+    
+    def __delitem__(self, key):
         cur = self._conn.cursor()
         with self._conn:
             cur.execute('''DELETE FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
@@ -122,16 +124,22 @@ class Bucket(collections.MutableMapping):
     values = lambda self: list(self.itervalues())
 
 
-class BinaryBucket(Bucket):
-    """Binary safe Bucket."""
+class QuotedMap(LiteMap):
+    """Binary safe LiteMap."""
+    _dump_value = staticmethod(lambda x: x.encode('quoted-printable').replace('=20', ' '))
+    _load_value = staticmethod(lambda x: x.decode('quoted-printable'))
+    
+    
+class Base64Map(LiteMap):
+    """Binary safe LiteMap."""
     _dump_value = staticmethod(lambda x: base64.b64encode(x))
     _load_value = staticmethod(lambda x: base64.b64decode(x))
 
 
-class PickleBucket(Bucket):
-    """Value-pickling Bucket."""
-    _dump_value = staticmethod(lambda x: base64.b64encode(pickle.dumps(x, protocol=-1)))
-    _load_value = staticmethod(lambda x: pickle.loads(base64.b64decode(x)))
+class PickleMap(LiteMap):
+    """Value-pickling LiteMap."""
+    _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
+    _load_value = staticmethod(lambda x: pickle.loads(str(x)))
 
 
 def test_thread_safe():
@@ -142,7 +150,7 @@ def test_thread_safe():
     import time
     
     path = '/tmp/keystore_test.sqlite'
-    store = BinaryBucket(path)
+    store = BinaryMap(path)
     
     def target():
         for i in xrange(100):
@@ -166,25 +174,25 @@ if __name__ == '__main__':
     # import bsddb
     import os
     
-    store = PickleBucket('testing.sqlite')
+    store = PickleMap(':memory:')
     store.clear()
     
     start_time = time()
     
-    # for i in range(1000):
-    #         store[str(i)] = str(i ** 2)
-    # store.setmany((str(i), str(i**2)) for i in range(1000))
     store['key'] = 'whatever'
     print store['key']
     print 'key' in store
     print 'not' in store
     
-    for i in range(10):
-        store[os.urandom(5)] = os.urandom(10)
+    for i in range(100):
+        key = os.urandom(5)
+        value = os.urandom(10)
+        store[key] = value
+        assert store[key] == value, '%r != %r' % (repr(store[key]), value)
     
     print len(store)
     #     print store.keys()
-    print store.items()
+    # print store.items()
     
     # test_thread_safe()
     
