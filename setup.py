@@ -2,7 +2,7 @@
 from distutils.core import setup
 
 setup(
-    name='litemap',
+    name='LiteMap',
     version='0.1a',
     description='Mapping class which stores in SQLite database.',
     url='http://github.com/mikeboers/LiteMap',
