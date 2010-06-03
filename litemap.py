@@ -17,7 +17,7 @@ class LiteMap(collections.MutableMapping):
         with self._conn:
             cur = self._conn.cursor()
             cur.execute('''CREATE TABLE IF NOT EXISTS %s (
-                key   BLOB UNIQUE ON CONFLICT REPLACE,
+                key   STRING UNIQUE ON CONFLICT REPLACE,
                 value BLOB
             )''' % self._table)
             index_name = self._escape(table + '_index')
