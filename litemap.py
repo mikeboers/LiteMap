@@ -16,7 +16,10 @@ class LiteMap(collections.MutableMapping):
         self._create_table()
     
     def _escape(self, v):
-        return "'%s'" % v.replace("'", "''")
+        """Escapes a SQLite identifier."""
+        # HACK: there must be a better way to do this (but this does appear to
+        # work just fine as long as there is no null byte).
+        return '"%s"' % v.replace('"', '""')
     
     @property
     def _conn(self):
