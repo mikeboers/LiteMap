@@ -120,19 +120,14 @@ class LiteMap(collections.MutableMapping):
     values = lambda self: list(self.itervalues())
 
 
-
-class PickleMap(LiteMap):
-    """Value-pickling LiteMap."""
-    
-    _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
-    _load_value = staticmethod(lambda x: pickle.loads(str(x)))
-
 def _is_reprable(key):
     t = type(key)
     return t in (int, str, unicode) or (t is tuple and all(
         _is_reprable(x) for x in key))
 
-class KeyPickleMap(PickleMap):
+class PickleMap(LiteMap):
+    """Value-pickling LiteMap."""
+    
     
     @staticmethod
     def _dump_key(key):
@@ -141,6 +136,9 @@ class KeyPickleMap(PickleMap):
         return repr(key)
     
     _load_key = staticmethod(lambda x: ast.literal_eval(x))
+    
+    _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
+    _load_value = staticmethod(lambda x: pickle.loads(str(x)))
 
 
 def test_thread_safe():
@@ -175,7 +173,7 @@ if __name__ == '__main__':
     # import bsddb
     import os
     
-    store = KeyPickleMap(':memory:')
+    store = PickleMap(':memory:')
     store.clear()
     
     start_time = time()
