@@ -1,29 +1,32 @@
 # encoding: utf8
 
+import os
 import sqlite3
 import cPickle as pickle
 import collections
 import threading
+import hashlib
 
-import derepr
+import dehash
 
 
 class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite."""
     
     def __init__(self, path, table='__bucket__'):
-        self._path = path
+        self._path = os.path.abspath(os.path.expanduser(path))
         self._table = self._escape(table)
         self._local = threading.local()
         
         with self._conn:
             cur = self._conn.cursor()
             cur.execute('''CREATE TABLE IF NOT EXISTS %s (
-                key   BLOB UNIQUE ON CONFLICT REPLACE,
+                hash  BLOB UNIQUE ON CONFLICT REPLACE,
+                key   BLOB,
                 value BLOB
             )''' % self._table)
             index_name = self._escape(table + '_index')
-            cur.execute('''CREATE INDEX IF NOT EXISTS %s on %s (key)''' % (index_name, self._table))
+            cur.execute('''CREATE INDEX IF NOT EXISTS %s on %s (hash)''' % (index_name, self._table))
     
     def _escape(self, v):
         """Escapes a SQLite identifier."""
@@ -43,16 +46,15 @@ class LiteMap(collections.MutableMapping):
     # dumping everything to a buffer SQLite will store the data as a BLOB,
     # therefore preserving binary data. If it was stored as a STRING then it
     # would truncate at the first null byte.
-    _dump_key = buffer
-    _load_key = str
-    _dump_value = buffer
-    _load_value = str
-    
+    _hash_method = hashlib.md5
+    _hash = classmethod(lambda cls, x: buffer(dehash.dehash(x, cls._hash_method)))
+    _dump = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
+    _load = staticmethod(lambda x: pickle.loads(str(x)))
     
     def setmany(self, items):
         with self._conn:
-            self._conn.executemany('''INSERT INTO %s VALUES (?, ?)''' % self._table, (
-                (self._dump_key(key), self._dump_value(value)) for key, value in items
+            self._conn.executemany('''INSERT INTO %s VALUES (?, ?, ?)''' % self._table, (
+                (self._hash(key), self._dump(key), self._dump(value)) for key, value in items
             ))
     
     def __setitem__(self, key, value):
@@ -60,30 +62,30 @@ class LiteMap(collections.MutableMapping):
 
     def __getitem__(self, key):
         cur = self._conn.cursor()
-        cur.execute('''SELECT value FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
+        cur.execute('''SELECT value FROM %s WHERE hash = ?''' % self._table, (self._hash(key), ))
         res = cur.fetchone()
         if not res:
             raise KeyError(key)
-        return self._load_value(res[0])
+        return self._load(res[0])
     
     def __contains__(self, key):
         cur = self._conn.cursor()
-        cur.execute('''SELECT COUNT(*) FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
+        cur.execute('''SELECT COUNT(*) FROM %s WHERE hash = ?''' % self._table, (self._hash(key), ))
         res = cur.fetchone()
         return bool(res[0])
     
-    def getmany(self, keys, *args):
-        cur = self._conn.cursor()
-        cur.execute('''SELECT key, value FROM %s WHERE key IN (%s)''' % (
-            self._table, ','.join(['?'] * len(keys))), tuple(self._dump_key(x) for x in keys))
-        map = dict(cur.fetchall())
-        res = [self._load_value(map.get(x, *args)) for x in keys]
-        return res
+    # def getmany(self, keys, *args):
+    #     cur = self._conn.cursor()
+    #     cur.execute('''SELECT key, value FROM %s WHERE key IN (%s)''' % (
+    #         self._table, ','.join(['?'] * len(keys))), tuple(self._dump_key(x) for x in keys))
+    #     map = dict(cur.fetchall())
+    #     res = [self._load(map.get(x, *args)) for x in keys]
+    #     return res
     
     def __delitem__(self, key):
         cur = self._conn.cursor()
         with self._conn:
-            cur.execute('''DELETE FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
+            cur.execute('''DELETE FROM %s WHERE hash = ?''' % self._table, (self._hash(key), ))
         if not cur.rowcount:
             raise KeyError(key)
     
@@ -101,13 +103,13 @@ class LiteMap(collections.MutableMapping):
         cur = self._conn.cursor()
         cur.execute('''SELECT key, value FROM %s''' % self._table)
         for row in cur:
-            yield self._load_key(row[0]), self._load_value(row[1])
+            yield self._load(row[0]), self._load(row[1])
     
     def __iter__(self):
         cur = self._conn.cursor()
         cur.execute('''SELECT key FROM %s''' % self._table)
         for row in cur:
-            yield self._load_key(row[0])
+            yield self._load(row[0])
 
     iterkeys = __iter__
 
@@ -115,21 +117,12 @@ class LiteMap(collections.MutableMapping):
         cur = self._conn.cursor()
         cur.execute('''SELECT value FROM %s''' % self._table)
         for row in cur:
-            yield self._load_value(row[0])
+            yield self._load(row[0])
     
     items = lambda self: list(self.iteritems())
     keys = lambda self: list(self.iterkeys())
     values = lambda self: list(self.itervalues())
 
-
-
-class PickleMap(LiteMap):
-    """Value-pickling LiteMap."""
-    
-    _dump_key = staticmethod(lambda x: derepr.dumps(x))
-    _load_key = staticmethod(derepr.loads)
-    _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
-    _load_value = staticmethod(lambda x: pickle.loads(str(x)))
 
 
 
@@ -165,26 +158,34 @@ if __name__ == '__main__':
     # import bsddb
     import os
     
-    store = PickleMap(':memory:')
+    store = LiteMap('~/Desktop/test.sqlite')
     
     start_time = time()
     
     store['key'] = 'whatever'
-    print store['key']
-    print 'key' in store
-    print 'not' in store
+    assert store['key'] == 'whatever'
+    assert 'key' in store
+    del store['key']
+    assert 'key' not in store
+    try:
+        del store['key']
+    except KeyError:
+        pass
+    else:
+        assert False
+    
+    for i, word in enumerate('this is a sequence of words'.split()):
+        store[('word', i)] = word
+    
+    assert 'not' not in store
+    
     store[('tuple', 1)] = 'tuple_1'
-    print store[('tuple', 1)]
+    assert store[('tuple', 1)] == 'tuple_1'
+    
     for i in range(100):
         key = os.urandom(5)
         value = os.urandom(10)
         store[key] = value
         assert store[key] == value, '%r != %r' % (repr(store[key]), value)
-    
-    print len(store)
-    #     print store.keys()
-    # print store.items()
-    
-    # test_thread_safe()
     
     print time() - start_time
