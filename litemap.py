@@ -4,6 +4,7 @@ import sqlite3
 import cPickle as pickle
 import collections
 import threading
+import ast
 
 class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite."""
@@ -44,6 +45,7 @@ class LiteMap(collections.MutableMapping):
     _load_key = str
     _dump_value = buffer
     _load_value = str
+    
     
     def setmany(self, items):
         with self._conn:
@@ -121,9 +123,23 @@ class LiteMap(collections.MutableMapping):
 
 class PickleMap(LiteMap):
     """Value-pickling LiteMap."""
+    
     _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
     _load_value = staticmethod(lambda x: pickle.loads(str(x)))
 
+def _is_reprable_key(key):
+    return type(key) in (int, str, unicode) or (type(key) == tuple and all(
+        _is_reprable_key(x) for x in key))
+
+class KeyPickleMap(PickleMap):
+    
+    @staticmethod
+    def _dump_key(key):
+        if not _is_reprable_key(key):
+            raise ValueError('cannot serialize key %r' % key)
+        return repr(key)
+    
+    _load_key = staticmethod(lambda x: ast.literal_eval(x))
 
 
 def test_thread_safe():
@@ -133,8 +149,8 @@ def test_thread_safe():
     import random
     import time
     
-    path = '/tmp/keystore_test.sqlite'
-    store = BinaryMap(path)
+    path = ':memory:'
+    store = Litemap(path)
     
     def target():
         for i in xrange(100):
@@ -158,7 +174,7 @@ if __name__ == '__main__':
     # import bsddb
     import os
     
-    store = PickleMap(':memory:')
+    store = KeyPickleMap(':memory:')
     store.clear()
     
     start_time = time()
@@ -167,7 +183,8 @@ if __name__ == '__main__':
     print store['key']
     print 'key' in store
     print 'not' in store
-    
+    store[('tuple', 1)] = 'tuple_1'
+    print store[('tuple', 1)]
     for i in range(100):
         key = os.urandom(5)
         value = os.urandom(10)
