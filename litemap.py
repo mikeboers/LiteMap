@@ -5,7 +5,7 @@ import cPickle as pickle
 import collections
 import threading
 
-import myrepr
+import derepr
 
 
 class LiteMap(collections.MutableMapping):
@@ -123,16 +123,14 @@ class LiteMap(collections.MutableMapping):
 
 
 
-
-    
-    
 class PickleMap(LiteMap):
     """Value-pickling LiteMap."""
     
-    _dump_key = staticmethod(lambda x: myrepr.dumps(x))
-    _load_key = staticmethod(myrepr.loads)
+    _dump_key = staticmethod(lambda x: derepr.dumps(x))
+    _load_key = staticmethod(derepr.loads)
     _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
     _load_value = staticmethod(lambda x: pickle.loads(str(x)))
+
 
 
 def test_thread_safe():
@@ -168,7 +166,6 @@ if __name__ == '__main__':
     import os
     
     store = PickleMap(':memory:')
-    store.clear()
     
     start_time = time()
     
