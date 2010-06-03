@@ -4,6 +4,7 @@ from __future__ import print_function
 import base64
 import ast
 
+
 def dumps(x):
     if x in (True, False, None):
         return repr(x)
@@ -15,7 +16,7 @@ def dumps(x):
     if t is bytes:
         return "'%s'" % x.encode('string-escape')
     if t is unicode:
-        return "u'%s'" % x.encode('unicode-escape')
+        return "u'%s'" % x.encode('unicode-escape').replace("'", "\\'")
     if t is tuple:
         return '(%s)' % ', '.join(dumps(y) for y in x)
     # Below here is non-standard.
@@ -23,7 +24,6 @@ def dumps(x):
         return '[%s]' % ', '.join(dumps(y) for y in x)
     if t is dict:
         return '{%s}' % ', '.join(sorted('%s: %s' % (dumps(k), dumps(v)) for (k, v) in x.iteritems()))
-    raise TypeError('cannot dumps type %r' % t)
 
 def _adapt(x):
     t = type(x)
@@ -37,6 +37,7 @@ def _adapt(x):
     if t is dict:
         return dict((_adapt(k), _adapt(v)) for (k, v) in x.iteritems())
     return x
+    raise TypeError('cannot serialize type %r' % t)
 
 def loads(x):
     return _adapt(ast.literal_eval(x))
@@ -51,9 +52,14 @@ if __name__ == '__main__':
         u'hello',
         "single'quote",
         'double"quote',
+        u"single'quote",
+        u'double"quote',
+        'both quotes \'"\0 and junk',
+        u'both quotes \'"\0 and junk',
         u'¡™£¢∞§¶•ªº',
         '¡™£¢∞§¶•ªº',
         ''.join(map(chr, range(256))),
+        u''.join(map(unichr, range(256))),
         (0, 1, 2),
         (),
         (0, 'hello', (0, 1, u'inner')),
@@ -69,5 +75,5 @@ if __name__ == '__main__':
             print(r)
             x2 = loads(r)
             print(repr(x2))
-            print('ok' if x == x2 else 'ERROR')
+            assert x == x2
             print()
