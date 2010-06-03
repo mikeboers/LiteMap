@@ -133,8 +133,8 @@ class PickleMap(LiteMap):
     deterministic.
     
     Because of the repr-ing, this does not have all of the same lookup
-    behaviours of a normal dict. Ints and longs are not equal, nor are strings
-    and unicode objects.
+    behaviours of a normal dict. Ints and longs of the same value are not
+    considered equal, nor are strings and unicode objects.
     
     We know this will not be deterministic across the 32/64bit platform
     boundary when using integers > 2**32.
