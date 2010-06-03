@@ -5,6 +5,7 @@ import cPickle as pickle
 import collections
 import threading
 import ast
+import marshal
 
 
 class LiteMap(collections.MutableMapping):
@@ -138,8 +139,8 @@ def _det_repr(x):
 class PickleMap(LiteMap):
     """Value-pickling LiteMap."""
     
-    _dump_key = staticmethod(lambda x: _det_repr(x))
-    _load_key = staticmethod(lambda x: ast.literal_eval(x))
+    _dump_key = staticmethod(lambda x: buffer(marshal.dumps(x)))
+    _load_key = staticmethod(lambda x: marshal.loads(x))
     
     _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
     _load_value = staticmethod(lambda x: pickle.loads(str(x)))
