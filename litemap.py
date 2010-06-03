@@ -7,12 +7,7 @@ import base64
 import threading
 
 class LiteMap(collections.MutableMapping):
-    """Persistant mapping class.
-    
-    The keys and values will be truncated to null bytes. If you need a binary
-    safe LiteMap, use the BinaryMap or PickleMap.
-    
-    """
+    """Persistant mapping class backed by SQLite."""
     
     def __init__(self, path, name='__bucket__'):
         self._path = path
@@ -42,9 +37,12 @@ class LiteMap(collections.MutableMapping):
             key_name = self._escape(self._name + '_index')
             cur.execute('''CREATE INDEX IF NOT EXISTS %s on %s (key)''' % (key_name, self._table))
     
+    # Overide these in child classes to change the serializing behaviour. By
+    # dumping everything to a buffer SQLite will store the data as a BLOB,
+    # therefore preserving binary data. If it was stored as a STRING then it
+    # would truncate at the first null byte.
     _dump_key = buffer
     _load_key = str
-    
     _dump_value = buffer
     _load_value = str
     
@@ -53,22 +51,19 @@ class LiteMap(collections.MutableMapping):
             self._conn.executemany('''INSERT INTO %s VALUES (?, ?)''' % self._table, (
                 (self._dump_key(key), self._dump_value(value)) for key, value in items
             ))
-    def __setitem__(self, key, value):        
-        # print '__setitem__', repr(key), repr(value)
+    
+    def __setitem__(self, key, value):
         self.setmany([(key, value)])
 
     def __getitem__(self, key):
-        # print 'getting', repr(key)
         cur = self._conn.cursor()
         cur.execute('''SELECT value FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
         res = cur.fetchone()
         if not res:
             raise KeyError(key)
-        # print '__getitem__', repr(key), repr(res[0])
         return self._load_value(res[0])
     
     def __contains__(self, key):
-        # print 'contains', repr(key)
         cur = self._conn.cursor()
         cur.execute('''SELECT COUNT(*) FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
         res = cur.fetchone()
@@ -140,6 +135,7 @@ class PickleMap(LiteMap):
     """Value-pickling LiteMap."""
     _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
     _load_value = staticmethod(lambda x: pickle.loads(str(x)))
+
 
 
 def test_thread_safe():
