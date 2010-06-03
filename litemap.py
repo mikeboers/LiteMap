@@ -127,15 +127,16 @@ class PickleMap(LiteMap):
     _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
     _load_value = staticmethod(lambda x: pickle.loads(str(x)))
 
-def _is_reprable_key(key):
-    return type(key) in (int, str, unicode) or (type(key) == tuple and all(
-        _is_reprable_key(x) for x in key))
+def _is_reprable(key):
+    t = type(key)
+    return t in (int, str, unicode) or (t is tuple and all(
+        _is_reprable(x) for x in key))
 
 class KeyPickleMap(PickleMap):
     
     @staticmethod
     def _dump_key(key):
-        if not _is_reprable_key(key):
+        if not _is_reprable(key):
             raise ValueError('cannot serialize key %r' % key)
         return repr(key)
     
