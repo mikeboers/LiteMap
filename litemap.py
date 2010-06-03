@@ -8,12 +8,19 @@ import threading
 class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite."""
     
-    def __init__(self, path, name='__bucket__'):
+    def __init__(self, path, table='__bucket__'):
         self._path = path
-        self._name = name
-        self._table = self._escape(name)
+        self._table = self._escape(table)
         self._local = threading.local()
-        self._create_table()
+        
+        with self._conn:
+            cur = self._conn.cursor()
+            cur.execute('''CREATE TABLE IF NOT EXISTS %s (
+                key   BLOB UNIQUE ON CONFLICT REPLACE,
+                value BLOB
+            )''' % self._table)
+            index_name = self._escape(table + '_index')
+            cur.execute('''CREATE INDEX IF NOT EXISTS %s on %s (key)''' % (index_name, self._table))
     
     def _escape(self, v):
         """Escapes a SQLite identifier."""
@@ -28,16 +35,6 @@ class LiteMap(collections.MutableMapping):
             self._local.conn = sqlite3.connect(self._path)
             self._local.conn.text_factory = str
         return self._local.conn
-        
-    def _create_table(self):    
-        with self._conn:
-            cur = self._conn.cursor()
-            cur.execute('''CREATE TABLE IF NOT EXISTS %s (
-                key   BLOB UNIQUE ON CONFLICT REPLACE,
-                value BLOB
-            )''' % self._table)
-            key_name = self._escape(self._name + '_index')
-            cur.execute('''CREATE INDEX IF NOT EXISTS %s on %s (key)''' % (key_name, self._table))
     
     # Overide these in child classes to change the serializing behaviour. By
     # dumping everything to a buffer SQLite will store the data as a BLOB,
