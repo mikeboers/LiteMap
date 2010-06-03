@@ -9,8 +9,8 @@ import ast
 class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite."""
     
-    def __init__(self, path, table='__bucket__'):
-        self._path = os.path.abspath(os.path.expanduser(path))
+    def __init__(self, path, table='__main__'):
+        self._path = os.path.abspath(os.path.expanduser(path)) if path != ':memory:' else path
         self._table = self._escape(table)
         self._local = threading.local()
         
