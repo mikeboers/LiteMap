@@ -6,6 +6,7 @@ import collections
 import threading
 import ast
 
+
 class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite."""
     
@@ -121,25 +122,28 @@ class LiteMap(collections.MutableMapping):
 
 
 
+def _det_repr(x):
+    if x is None:
+        return repr(None)
+    t = type(x)
+    if t is long:
+        return repr(t).strip('L')
+    if t is tuple:
+        return repr(tuple(_det_repr(y) for y in x))
+    if t in (int, bool, str, unicode):
+        return repr(x)
+    raise ValueError('cannot deterministically serialize %r' % x)
+
+        
 class PickleMap(LiteMap):
     """Value-pickling LiteMap."""
+    
+    _dump_key = staticmethod(lambda x: _det_repr(x))
+    _load_key = staticmethod(lambda x: ast.literal_eval(x))
     
     _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
     _load_value = staticmethod(lambda x: pickle.loads(str(x)))
 
-def _is_reprable_key(key):
-    return type(key) in (int, str, unicode) or (type(key) == tuple and all(
-        _is_reprable_key(x) for x in key))
-
-class KeyPickleMap(PickleMap):
-    
-    @staticmethod
-    def _dump_key(key):
-        if not _is_reprable_key(key):
-            raise ValueError('cannot serialize key %r' % key)
-        return repr(key)
-    
-    _load_key = staticmethod(lambda x: ast.literal_eval(x))
 
 
 def test_thread_safe():
@@ -174,7 +178,7 @@ if __name__ == '__main__':
     # import bsddb
     import os
     
-    store = KeyPickleMap(':memory:')
+    store = PickleMap(':memory:')
     store.clear()
     
     start_time = time()
