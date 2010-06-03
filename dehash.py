@@ -1,11 +1,10 @@
 # encoding: utf8
 
 from __future__ import print_function
-import base64
-import ast
+import datetime
+import hashlib
 
-
-def dumps(x):
+def derepr(x):
     if x in (True, False, None):
         return repr(x)
     t = type(x)
@@ -18,16 +17,19 @@ def dumps(x):
     if t is unicode:
         return "u'%s'" % x.encode('unicode-escape').replace("'", "\\'")
     if t is tuple:
-        return '(%s)' % ', '.join(dumps(y) for y in x)
+        return '(%s)' % ', '.join(derepr(y) for y in x)
+    if t is set:
+        return 'set([%s])' % ', '.join(derepr(y) for y in x)
     # Below here is non-standard.
     if t is list:
-        return '[%s]' % ', '.join(dumps(y) for y in x)
+        return '[%s]' % ', '.join(derepr(y) for y in x)
     if t is dict:
-        return '{%s}' % ', '.join(sorted('%s: %s' % (dumps(k), dumps(v)) for (k, v) in x.iteritems()))
+        return '{%s}' % ', '.join(sorted('%s: %s' % (derepr(k), derepr(v)) for (k, v) in x.iteritems()))
     raise TypeError('cannot serialize type %r' % t)
 
-def loads(x):
-    return ast.literal_eval(x)
+def dehash(x, hash=hashlib.sha256):
+    return hash(derepr(x)).digest()
+    
 
 
 if __name__ == '__main__':
@@ -59,9 +61,6 @@ if __name__ == '__main__':
         (True, False, (1, 2, None)),
         ]:
             print(repr(x))
-            r = dumps(x)
-            print(r)
-            x2 = loads(r)
-            print(repr(x2))
-            assert x == x2
+            print(derepr(x))
+            print(dehash(x, hashlib.md5).encode('hex'))
             print()
