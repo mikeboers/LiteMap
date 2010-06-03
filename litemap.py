@@ -199,21 +199,21 @@ if __name__ == '__main__':
     start_time = time()
     
     store['key'] = 'whatever'
-    print store['key']
-    print 'key' in store
-    print 'not' in store
+    assert store['key'] == 'whatever'
+    assert 'key' in store
+    assert 'not' not in store
     store[('tuple', 1)] = 'tuple_1'
-    print store[('tuple', 1)]
+    assert store[('tuple', 1)] == 'tuple_1'
     for i in range(100):
         key = os.urandom(5)
         value = os.urandom(10)
         store[key] = value
         assert store[key] == value, '%r != %r' % (repr(store[key]), value)
     
-    print len(store)
-    #     print store.keys()
-    # print store.items()
+    store['a'] = 1
+    assert store.setdefault('a', 2) == 1
+    assert store['a'] == 1
+    assert store.setdefault('b', 1) == 1
+    assert store['b'] == 1
     
-    # test_thread_safe()
-    
-    print time() - start_time
+    print 'test duration:', time() - start_time
