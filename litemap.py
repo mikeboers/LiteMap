@@ -6,8 +6,13 @@ import collections
 import threading
 import ast
 
-class LiteMap(collections.MutableMapping):
-    """Persistant mapping class backed by SQLite."""
+class RawLiteMap(collections.MutableMapping):
+    """Persistant mapping class backed by SQLite.
+    
+    Only capable of mapping strings to strings; everything will be cast to a
+    buffer on it's was into the database and back to a str on the way out.
+    
+    """
     
     def __init__(self, path, table='__main__'):
         self._path = os.path.abspath(os.path.expanduser(path)) if path != ':memory:' else path
@@ -125,10 +130,13 @@ def _is_reprable(key):
     return t in (int, str, unicode) or (t is tuple and all(
         _is_reprable(x) for x in key))
 
-class PickleMap(LiteMap):
-    """Value-pickling LiteMap.
+class LiteMap(RawLiteMap):
+    """Persistant mapping class backed by SQLite.
     
-    Keys may consist of strings, unicode, ints, and tuples (of these objects).
+    Values are limited to pickleable types, and mutations to stored objects
+    are not reflected in the database.
+    
+    Keys may consist of strings, unicode, ints, and tuples (of these typed).
     We are using repr to serialize the key and we are assuming that it is
     deterministic.
     
@@ -137,7 +145,8 @@ class PickleMap(LiteMap):
     considered equal, nor are strings and unicode objects.
     
     We know this will not be deterministic across the 32/64bit platform
-    boundary when using integers > 2**32.
+    boundary when using integers > 2**32. There may be other cases that we are
+    not aware of.
     
     """
         
@@ -148,7 +157,6 @@ class PickleMap(LiteMap):
         return repr(key)
     
     _load_key = staticmethod(lambda x: ast.literal_eval(x))
-    
     _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
     _load_value = staticmethod(lambda x: pickle.loads(str(x)))
 
@@ -161,7 +169,7 @@ def test_thread_safe():
     import time
     
     path = ':memory:'
-    store = Litemap(path)
+    store = RawLiteMap(path)
     
     def target():
         for i in xrange(100):
@@ -185,7 +193,7 @@ if __name__ == '__main__':
     # import bsddb
     import os
     
-    store = PickleMap(':memory:')
+    store = LiteMap(':memory:')
     store.clear()
     
     start_time = time()
