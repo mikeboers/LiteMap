@@ -126,13 +126,25 @@ def _is_reprable(key):
         _is_reprable(x) for x in key))
 
 class PickleMap(LiteMap):
-    """Value-pickling LiteMap."""
+    """Value-pickling LiteMap.
     
+    Keys may consist of strings, unicode, ints, and tuples (of these objects).
+    We are using repr to serialize the key and we are assuming that it is
+    deterministic.
     
+    Because of the repr-ing, this does not have all of the same lookup
+    behaviours of a normal dict. Ints and longs are not equal, nor are strings
+    and unicode objects.
+    
+    We know this will not be deterministic across the 32/64bit platform
+    boundary when using integers > 2**32.
+    
+    """
+        
     @staticmethod
     def _dump_key(key):
         if not _is_reprable(key):
-            raise ValueError('cannot serialize key %r' % key)
+            raise ValueError('cannot deterministically serialize key %r' % key)
         return repr(key)
     
     _load_key = staticmethod(lambda x: ast.literal_eval(x))
