@@ -24,23 +24,11 @@ def dumps(x):
         return '[%s]' % ', '.join(dumps(y) for y in x)
     if t is dict:
         return '{%s}' % ', '.join(sorted('%s: %s' % (dumps(k), dumps(v)) for (k, v) in x.iteritems()))
-
-def _adapt(x):
-    t = type(x)
-    if t in (bytes, unicode, bool):
-        return x
-    if t is tuple:
-        return t(_adapt(y) for y in x)
-    # Below here is non-standard.    
-    if t is list:
-        return list(_adapt(y) for y in x)
-    if t is dict:
-        return dict((_adapt(k), _adapt(v)) for (k, v) in x.iteritems())
-    return x
     raise TypeError('cannot serialize type %r' % t)
 
 def loads(x):
-    return _adapt(ast.literal_eval(x))
+    return ast.literal_eval(x)
+
 
 if __name__ == '__main__':
     for x in [
