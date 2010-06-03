@@ -3,7 +3,6 @@
 import sqlite3
 import cPickle as pickle
 import collections
-import base64
 import threading
 
 class LiteMap(collections.MutableMapping):
@@ -118,17 +117,6 @@ class LiteMap(collections.MutableMapping):
     keys = lambda self: list(self.iterkeys())
     values = lambda self: list(self.itervalues())
 
-
-class QuotedMap(LiteMap):
-    """Binary safe LiteMap."""
-    _dump_value = staticmethod(lambda x: x.encode('quoted-printable').replace('=20', ' '))
-    _load_value = staticmethod(lambda x: x.decode('quoted-printable'))
-    
-    
-class Base64Map(LiteMap):
-    """Binary safe LiteMap."""
-    _dump_value = staticmethod(lambda x: base64.b64encode(x))
-    _load_value = staticmethod(lambda x: base64.b64decode(x))
 
 
 class PickleMap(LiteMap):
