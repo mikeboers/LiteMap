@@ -129,7 +129,7 @@ class LiteMap(collections.MutableMapping):
 class PickleMap(LiteMap):
     """Value-pickling LiteMap."""
     
-    _dump_key = staticmethod(lambda x: buffer(myrepr.dumps(x)))
+    _dump_key = staticmethod(lambda x: myrepr.dumps(x))
     _load_key = staticmethod(myrepr.loads)
     _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
     _load_value = staticmethod(lambda x: pickle.loads(str(x)))
