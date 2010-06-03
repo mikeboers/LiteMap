@@ -10,7 +10,7 @@ class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite."""
     
     def __init__(self, path, table='__bucket__'):
-        self._path = path
+        self._path = os.path.abspath(os.path.expanduser(path))
         self._table = self._escape(table)
         self._local = threading.local()
         
