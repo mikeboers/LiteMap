@@ -10,7 +10,9 @@ class RawLiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite.
     
     Only capable of mapping strings to strings; everything will be cast to a
-    buffer on it's was into the database and back to a str on the way out.
+    buffer on its way into the database and back to a str on the way out.
+    
+    See the LiteMap class for storage of other types.
     
     """
     
