@@ -2,3 +2,4 @@
 	+ It would allow for a much more efficient garbage collector.
 	- If you really need something of such high performance then just custom
 	  make something.
+- Consider being able to watch mutable objects for changes.
