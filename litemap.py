@@ -17,7 +17,7 @@ class RawLiteMap(collections.MutableMapping):
     """
     
     def __init__(self, path, table='__main__'):
-        self._path = os.path.abspath(os.path.expanduser(path)) if path != ':memory:' else path
+        self._path = path
         self._table = self._escape(table)
         self._local = threading.local()
         
