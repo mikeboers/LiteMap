@@ -1,18 +1,14 @@
 # encoding: utf8
 
 import sqlite3
-import cPickle as pickle
 import collections
-import threading
-import ast
 
-class RawLiteMap(collections.MutableMapping):
+
+class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite.
     
     Only capable of mapping strings to strings; everything will be cast to a
     buffer on its way into the database and back to a str on the way out.
-    
-    See the LiteMap class for storage of other types.
     
     """
     
@@ -33,7 +29,7 @@ class RawLiteMap(collections.MutableMapping):
     def _escape(self, v):
         """Escapes a SQLite identifier."""
         # HACK: there must be a better way to do this (but this does appear to
-        # work just fine as long as there is no null byte).
+        # work just fine as long as there are no null byte).
         return '"%s"' % v.replace('"', '""')
     
     @property
@@ -52,7 +48,6 @@ class RawLiteMap(collections.MutableMapping):
     _load_key = str
     _dump_value = buffer
     _load_value = str
-    
     
     def setmany(self, items):
         with self._conn:
@@ -117,40 +112,4 @@ class RawLiteMap(collections.MutableMapping):
     items = lambda self: list(self.iteritems())
     keys = lambda self: list(self.iterkeys())
     values = lambda self: list(self.itervalues())
-
-
-def _is_reprable(key):
-    t = type(key)
-    return t in (int, str, unicode) or (t is tuple and all(
-        _is_reprable(x) for x in key))
-
-class LiteMap(RawLiteMap):
-    """Persistant mapping class backed by SQLite.
-    
-    Values are limited to pickleable types, and mutations to stored objects
-    are not reflected in the database.
-    
-    Keys may consist of strings, unicode, ints, and tuples (of these typed).
-    We are using repr to serialize the key and we are assuming that it is
-    deterministic.
-    
-    Because of the repr-ing, this does not have all of the same lookup
-    behaviours of a normal dict. Ints and longs of the same value are not
-    considered equal, nor are strings and unicode objects.
-    
-    We know this will not be deterministic across the 32/64bit platform
-    boundary when using integers > 2**32. There may be other cases that we are
-    not aware of.
-    
-    """
-        
-    @staticmethod
-    def _dump_key(key):
-        if not _is_reprable(key):
-            raise ValueError('cannot deterministically serialize key %r' % key)
-        return repr(key)
-    
-    _load_key = staticmethod(lambda x: ast.literal_eval(x))
-    _dump_value = staticmethod(lambda x: buffer(pickle.dumps(x, protocol=-1)))
-    _load_value = staticmethod(lambda x: pickle.loads(str(x)))
 
