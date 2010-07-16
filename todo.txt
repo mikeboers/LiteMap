@@ -1,10 +1,7 @@
-- Consider merging the ExpiringView with LiteMap:
-	+ It would allow for a much more efficient garbage collector.
-	- If you really need something of such high performance then just custom
-	  make something.
+
 - Consider being able to watch mutable objects for changes, or to write back
   everything that is read at the end of a "transaction".
-- Consider abstracting out the engine so that we can use sqlite or bsddb.
+
 - Consider adding a lock(exclusive=False) method so we can avoid deadlocks in
   some circumstances. This could return a context object which will unlock on
   exit.
