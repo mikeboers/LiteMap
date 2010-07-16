@@ -77,14 +77,6 @@ class RawLiteMap(collections.MutableMapping):
         res = cur.fetchone()
         return bool(res[0])
     
-    def getmany(self, keys, *args):
-        cur = self._conn.cursor()
-        cur.execute('''SELECT key, value FROM %s WHERE key IN (%s)''' % (
-            self._table, ','.join(['?'] * len(keys))), tuple(self._dump_key(x) for x in keys))
-        map = dict(cur.fetchall())
-        res = [self._load_value(map.get(x, *args)) for x in keys]
-        return res
-    
     def __delitem__(self, key):
         cur = self._conn.cursor()
         with self._conn:
