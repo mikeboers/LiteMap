@@ -2,7 +2,7 @@
 
 import sqlite3
 import collections
-
+import threading
 
 class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite.
