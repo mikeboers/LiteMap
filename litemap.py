@@ -4,6 +4,8 @@ import sqlite3
 import collections
 import threading
 
+__all__ = ['LiteMap']
+
 class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite.
     
@@ -112,4 +114,25 @@ class LiteMap(collections.MutableMapping):
     items = lambda self: list(self.iteritems())
     keys = lambda self: list(self.iterkeys())
     values = lambda self: list(self.itervalues())
+    
+    def update(self, *args, **kwargs):
+        self.setmany(self._update_iter(args, kwargs))
+    
+    def _update_iter(self, args, kwargs):
+        """A generator to turn the args/kwargs of the update method into items.
+        
+        This is written in the spirit of the documentation for the dict.update
+        method.
+        
+        """
+        for arg in args:
+            if hasattr(arg, 'keys'):
+                for key in arg.keys():
+                    yield (key, arg[key])
+            else:
+                for item in arg:
+                    yield item
+        for item in kwargs.iteritems():
+            yield item
+    
 
