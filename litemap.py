@@ -3,8 +3,12 @@
 import sqlite3
 import collections
 import threading
+import sys
+
+PY3 = sys.version_info[0] >= 3
 
 __all__ = ['LiteMap']
+
 
 class LiteMap(collections.MutableMapping):
     """Persistant mapping class backed by SQLite.
@@ -42,15 +46,21 @@ class LiteMap(collections.MutableMapping):
             self._local.conn.text_factory = str
         return self._local.conn
     
-    # Overide these in child classes to change the serializing behaviour. By
-    # dumping everything to a buffer SQLite will store the data as a BLOB,
-    # therefore preserving binary data. If it was stored as a STRING then it
-    # would truncate at the first null byte.
-    _dump_key = buffer
-    _load_key = str
-    _dump_value = buffer
-    _load_value = str
-    
+    if PY3:
+        _dump_key = lambda self, x: x
+        _load_key = lambda self, x: x
+        _dump_value = lambda self, x: x
+        _load_value = lambda self, x: x
+    else:
+        # Overide these in child classes to change the serializing behaviour. By
+        # dumping everything to a buffer SQLite will store the data as a BLOB,
+        # therefore preserving binary data. If it was stored as a STRING then it
+        # would truncate at the first null byte.
+        _dump_key = buffer
+        _load_key = str
+        _dump_value = buffer
+        _load_value = str
+
     def setmany(self, items):
         with self._conn:
             self._conn.executemany('''INSERT INTO %s VALUES (?, ?)''' % self._table, (
@@ -132,7 +142,7 @@ class LiteMap(collections.MutableMapping):
             else:
                 for item in arg:
                     yield item
-        for item in kwargs.iteritems():
+        for item in kwargs.items():
             yield item
     
 
