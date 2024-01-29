@@ -1,7 +1,7 @@
 # encoding: utf8
 
 import sqlite3
-import collections
+import collections.abc
 import threading
 import sys
 
@@ -10,19 +10,19 @@ PY3 = sys.version_info[0] >= 3
 __all__ = ['LiteMap']
 
 
-class LiteMap(collections.MutableMapping):
+class LiteMap(collections.abc.MutableMapping):
     """Persistant mapping class backed by SQLite.
-    
+
     Only capable of mapping strings to strings; everything will be cast to a
     buffer on its way into the database and back to a str on the way out.
-    
+
     """
-    
+
     def __init__(self, path, table='__main__'):
         self._path = path
         self._table = self._escape(table)
         self._local = threading.local()
-        
+
         with self._conn:
             cur = self._conn.cursor()
             cur.execute('''CREATE TABLE IF NOT EXISTS %s (
@@ -31,13 +31,13 @@ class LiteMap(collections.MutableMapping):
             )''' % self._table)
             index_name = self._escape(table + '_index')
             cur.execute('''CREATE INDEX IF NOT EXISTS %s on %s (key)''' % (index_name, self._table))
-    
+
     def _escape(self, v):
         """Escapes a SQLite identifier."""
         # HACK: there must be a better way to do this (but this does appear to
         # work just fine as long as there are no null byte).
         return '"%s"' % v.replace('"', '""')
-    
+
     @property
     def _conn(self):
         conn = getattr(self._local, 'conn', None)
@@ -45,7 +45,7 @@ class LiteMap(collections.MutableMapping):
             self._local.conn = sqlite3.connect(self._path)
             self._local.conn.text_factory = str
         return self._local.conn
-    
+
     if PY3:
         _dump_key = lambda self, x: x
         _load_key = lambda self, x: x
@@ -66,7 +66,7 @@ class LiteMap(collections.MutableMapping):
             self._conn.executemany('''INSERT INTO %s VALUES (?, ?)''' % self._table, (
                 (self._dump_key(key), self._dump_value(value)) for key, value in items
             ))
-    
+
     def __setitem__(self, key, value):
         self.setmany([(key, value)])
 
@@ -77,20 +77,20 @@ class LiteMap(collections.MutableMapping):
         if not res:
             raise KeyError(key)
         return self._load_value(res[0])
-    
+
     def __contains__(self, key):
         cur = self._conn.cursor()
         cur.execute('''SELECT COUNT(*) FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
         res = cur.fetchone()
         return bool(res[0])
-    
+
     def __delitem__(self, key):
         cur = self._conn.cursor()
         with self._conn:
             cur.execute('''DELETE FROM %s WHERE key = ?''' % self._table, (self._dump_key(key), ))
         if not cur.rowcount:
             raise KeyError(key)
-    
+
     def clear(self):
         with self._conn:
             self._conn.execute('''DELETE FROM %s''' % self._table)
@@ -106,7 +106,7 @@ class LiteMap(collections.MutableMapping):
         cur.execute('''SELECT key, value FROM %s''' % self._table)
         for row in cur:
             yield self._load_key(row[0]), self._load_value(row[1])
-    
+
     def __iter__(self):
         cur = self._conn.cursor()
         cur.execute('''SELECT key FROM %s''' % self._table)
@@ -120,20 +120,20 @@ class LiteMap(collections.MutableMapping):
         cur.execute('''SELECT value FROM %s''' % self._table)
         for row in cur:
             yield self._load_value(row[0])
-    
+
     items = lambda self: list(self.iteritems())
     keys = lambda self: list(self.iterkeys())
     values = lambda self: list(self.itervalues())
-    
+
     def update(self, *args, **kwargs):
         self.setmany(self._update_iter(args, kwargs))
-    
+
     def _update_iter(self, args, kwargs):
         """A generator to turn the args/kwargs of the update method into items.
-        
+
         This is written in the spirit of the documentation for the dict.update
         method.
-        
+
         """
         for arg in args:
             if hasattr(arg, 'keys'):
@@ -144,5 +144,3 @@ class LiteMap(collections.MutableMapping):
                     yield item
         for item in kwargs.items():
             yield item
-    
-
