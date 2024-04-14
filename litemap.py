@@ -1,7 +1,7 @@
 # encoding: utf8
 
 import sqlite3
-import collections
+import collections.abc
 import threading
 import sys
 
@@ -10,7 +10,7 @@ PY3 = sys.version_info[0] >= 3
 __all__ = ['LiteMap']
 
 
-class LiteMap(collections.MutableMapping):
+class LiteMap(collections.abc.MutableMapping):
     """Persistant mapping class backed by SQLite.
     
     Only capable of mapping strings to strings; everything will be cast to a
